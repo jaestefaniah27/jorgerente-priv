@@ -4,12 +4,18 @@
 // reminder delivery and vice versa.
 //
 // Exports `createWorker` so the scheduling logic can be unit tested without
-// touching the network (by injecting a fake `sendNotification`).
+// touching the network (by injecting a fake `sendNotification`), and
+// `startWorkerLoop` so a process-manager entrypoint (scripts/run-reminder-
+// worker.mjs) can start the real poll loop unconditionally. The loop is
+// intentionally NOT auto-started based on "is this the entry script"
+// detection (e.g. comparing process.argv[1]): that check breaks under PM2,
+// which launches scripts through its own bootstrap module rather than
+// invoking `node scripts/reminder-worker.mjs` directly, so process.argv[1]
+// never matches this file's path there.
 
 import Database from "better-sqlite3";
 import path from "node:path";
 import fs from "node:fs";
-import { fileURLToPath } from "node:url";
 
 const DEFAULT_DB_PATH = path.join(process.cwd(), "data", "kanban.sqlite");
 
@@ -94,9 +100,7 @@ async function realSendNotification(sub, payload) {
   }
 }
 
-const isMain = process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1]);
-
-if (isMain) {
+export function startWorkerLoop() {
   const POLL_MS = Number(process.env.REMINDER_POLL_MS || 60_000);
   if (!process.env.VAPID_PUBLIC_KEY || !process.env.VAPID_PRIVATE_KEY) {
     console.error(
