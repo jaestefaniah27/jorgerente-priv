@@ -12,6 +12,30 @@ export function urlBase64ToUint8Array(base64String: string): Uint8Array {
   return outputArray;
 }
 
+// Wraps a promise so it can never hang the caller forever. Some browsers
+// don't reject Notification.requestPermission() when they decline to show
+// a real prompt — Chrome's "quiet" permission UI, for example, renders as a
+// small, easy-to-miss icon next to the address bar instead of a banner, and
+// the promise then simply never settles until that icon is clicked. Without
+// this, that leaves the button stuck on "Comprobando…" forever with no
+// error and nothing wrong to report. A similar risk exists for
+// serviceWorker.ready if activation ever stalls.
+function withTimeout<T>(promise: Promise<T>, ms: number, timeoutMessage: string): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(timeoutMessage)), ms);
+    promise.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (err) => {
+        clearTimeout(timer);
+        reject(err);
+      }
+    );
+  });
+}
+
 export async function subscribeToPush(): Promise<
   { status: "subscribed" } | { status: "unsupported" | "disabled" | "denied" | "error"; message?: string }
 > {
@@ -28,7 +52,11 @@ export async function subscribeToPush(): Promise<
   // permission first, before any other await, to keep it as close to the
   // click as possible.
   try {
-    const permission = await Notification.requestPermission();
+    const permission = await withTimeout(
+      Notification.requestPermission(),
+      20000,
+      "El navegador no respondió a la petición de permiso de notificaciones en 20s. Puede que haya quedado un aviso pendiente junto a la barra de direcciones (a veces se muestra como un pequeño icono en vez de una ventana emergente) o que las notificaciones estén bloqueadas para este sitio: revísalo y vuelve a intentarlo."
+    );
     if (permission !== "granted") {
       return { status: "denied" };
     }
@@ -39,7 +67,11 @@ export async function subscribeToPush(): Promise<
       return { status: "disabled" };
     }
 
-    const registration = await navigator.serviceWorker.ready;
+    const registration = await withTimeout(
+      navigator.serviceWorker.ready,
+      15000,
+      "El service worker no se activó a tiempo. Recarga la página e inténtalo de nuevo."
+    );
     let subscription = await registration.pushManager.getSubscription();
     if (!subscription) {
       subscription = await registration.pushManager.subscribe({
