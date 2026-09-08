@@ -26,12 +26,21 @@ export default function NotificationsToggle() {
 
   async function handleClick() {
     setState("checking");
-    const result = await subscribeToPush();
-    if (result.status === "subscribed") {
-      setState("on");
-    } else {
-      setState(result.status);
-      if ("message" in result) setMessage(result.message ?? null);
+    setMessage(null);
+    try {
+      const result = await subscribeToPush();
+      if (result.status === "subscribed") {
+        setState("on");
+      } else {
+        setState(result.status);
+        if ("message" in result) setMessage(result.message ?? null);
+      }
+    } catch (err) {
+      // Defensive: subscribeToPush already catches internally, but this
+      // guarantees the button never gets stuck on "Comprobando…" even if
+      // something throws outside of it.
+      setState("error");
+      setMessage(err instanceof Error ? err.message : String(err));
     }
   }
 
@@ -49,13 +58,20 @@ export default function NotificationsToggle() {
   }
 
   return (
-    <button
-      onClick={handleClick}
-      disabled={state === "checking"}
-      className="text-xs rounded-full border border-indigo-300 px-3 py-1 text-indigo-700 hover:bg-indigo-50 disabled:opacity-50"
-      title={message ?? undefined}
-    >
-      {state === "checking" ? "Comprobando…" : "Activar avisos"}
-    </button>
+    <span className="inline-flex items-center gap-1.5">
+      <button
+        onClick={handleClick}
+        disabled={state === "checking"}
+        className="text-xs rounded-full border border-indigo-300 px-3 py-1 text-indigo-700 hover:bg-indigo-50 disabled:opacity-50"
+        title={message ?? undefined}
+      >
+        {state === "checking" ? "Comprobando…" : "Activar avisos"}
+      </button>
+      {state === "error" && message && (
+        <span className="text-xs text-rose-600" title={message}>
+          Error: {message}
+        </span>
+      )}
+    </span>
   );
 }

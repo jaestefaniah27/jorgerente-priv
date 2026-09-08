@@ -19,18 +19,26 @@ export async function subscribeToPush(): Promise<
     return { status: "unsupported" };
   }
 
-  const keyRes = await fetch("/api/kanban/push/vapid-public-key");
-  const keyData = await keyRes.json();
-  if (!keyData.enabled || !keyData.publicKey) {
-    return { status: "disabled" };
-  }
-
-  const permission = await Notification.requestPermission();
-  if (permission !== "granted") {
-    return { status: "denied" };
-  }
-
+  // Everything below is wrapped in one try/catch: Notification.requestPermission()
+  // in particular can throw synchronously in some browsers (notably Safari,
+  // which requires the call to happen directly inside a user-gesture handler
+  // — an earlier `await` before it, or an uncaught rejection anywhere in this
+  // chain, used to leave the caller's promise permanently unresolved and the
+  // "Activar avisos" button stuck on "Comprobando…" forever). Request
+  // permission first, before any other await, to keep it as close to the
+  // click as possible.
   try {
+    const permission = await Notification.requestPermission();
+    if (permission !== "granted") {
+      return { status: "denied" };
+    }
+
+    const keyRes = await fetch("/api/kanban/push/vapid-public-key");
+    const keyData = await keyRes.json();
+    if (!keyData.enabled || !keyData.publicKey) {
+      return { status: "disabled" };
+    }
+
     const registration = await navigator.serviceWorker.ready;
     let subscription = await registration.pushManager.getSubscription();
     if (!subscription) {
