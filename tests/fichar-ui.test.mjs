@@ -49,7 +49,11 @@ async function main() {
   let res = await page.request.get(`${BASE}/fichar/manifest.webmanifest`);
   ok(res.status() === 200, `manifest -> 200 (got ${res.status()})`);
   const manifest = await res.json();
-  ok(manifest.scope === "/fichar", `manifest scope is /fichar (got ${manifest.scope})`);
+  // See the note in tests/ui.test.mjs: origin-wide scope keeps an installed
+  // app in standalone when switching modules, `id` keeps the installs apart.
+  ok(manifest.scope === "/", `manifest scope is / (got ${manifest.scope})`);
+  ok(manifest.id === "/fichar", `manifest id identifies the module (got ${manifest.id})`);
+  ok(manifest.start_url === "/fichar", `start_url opens the module (got ${manifest.start_url})`);
   ok(
     manifest.start_url.startsWith(manifest.scope),
     `start_url (${manifest.start_url}) sits inside the scope (${manifest.scope})`

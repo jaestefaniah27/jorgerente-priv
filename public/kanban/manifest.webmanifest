@@ -1,9 +1,10 @@
 {
+  "id": "/kanban",
   "name": "Jorgerente Kanban",
   "short_name": "Kanban",
   "description": "Tablero Kanban personal de Jorge",
   "start_url": "/kanban",
-  "scope": "/kanban",
+  "scope": "/",
   "display": "standalone",
   "background_color": "#0f172a",
   "theme_color": "#4f46e5",

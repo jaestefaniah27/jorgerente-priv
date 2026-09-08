@@ -44,7 +44,13 @@ async function main() {
   let res = await page.request.get(`${BASE}/kanban/manifest.webmanifest`);
   ok(res.status() === 200, `manifest.webmanifest -> 200 (got ${res.status()})`);
   const manifest = await res.json();
-  ok(manifest.scope === "/kanban", "manifest scope is /kanban");
+  // Scope is the whole origin so that moving between modules from an
+  // installed app never leaves it — on iOS, crossing the scope boundary drops
+  // you out of standalone and into an in-app browser. The modules stay
+  // distinct installs via `id`, which is the field meant for exactly that.
+  ok(manifest.scope === "/", `manifest scope is / (got ${manifest.scope})`);
+  ok(manifest.id === "/kanban", `manifest id identifies the module (got ${manifest.id})`);
+  ok(manifest.start_url === "/kanban", `start_url opens the module (got ${manifest.start_url})`);
   ok(
     manifest.start_url.startsWith(manifest.scope),
     `manifest start_url (${manifest.start_url}) is inside its scope (${manifest.scope})`

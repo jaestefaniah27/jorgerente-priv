@@ -96,3 +96,42 @@ duración y no una fecha absoluta para que un reloj desajustado en el móvil dé
 (descartado: un solo contador de descanso, un solo botón); historial de solo lectura
 (descartado: se puede editar y borrar, que es lo que hace útil el cierre automático);
 base de datos propia para el módulo (descartado: mismo fichero SQLite, tablas nuevas).
+
+## 2026-09-08 — El `scope` del manifest es el origen entero; el del service worker sigue por módulo
+
+**Contexto:** Jorge instaló las dos PWAs en su iPhone y se encontró con dos cosas: al
+añadir Fichar a la pantalla de inicio se le abría Kanban, y al cambiar de app desde el
+selector la página salía dentro del navegador integrado, con la barra de "cerrar / abrir en
+Safari" encima. Se revisó el HTML servido y el marcado era correcto: cada módulo enlaza su
+propio manifest, con su título y su icono. No era un bug del marcado.
+
+**Causa:** una PWA instalada que navega **fuera del `scope` de su manifest** se sale del
+modo standalone; es comportamiento definido, no un fallo. Con `scope` = `/kanban`, ir a
+`/fichar` queda fuera y iOS lo abre en un navegador dentro de la app. Lo de que instalar
+Fichar abriera Kanban no se pudo confirmar, pero apunta a lo mismo: dos manifests con
+scopes distintos en un mismo origen, que es justo donde WebKit ha ido flojo
+históricamente.
+
+**Decisión:** el `scope` de ambos manifests pasa a ser `/` (el origen entero), y cada uno
+declara un `id` propio (`/kanban`, `/fichar`) — que es el campo de la especificación
+pensado exactamente para distinguir dos apps instaladas del mismo origen. `start_url` sigue
+apuntando a su módulo, así que cada icono abre lo suyo, pero moverse entre módulos ya nunca
+cruza el borde del scope y no saca del modo app.
+
+Esto **revierte parcialmente** la entrada del 2026-09-07 sobre PWAs independientes por
+path: la separación entre módulos ya no la da el `scope` del manifest, la da el `id` más el
+`start_url`.
+
+**Sin cambios:** el scope del **service worker** sigue siendo por módulo (`/kanban`,
+`/fichar`, con su cabecera `Service-Worker-Allowed`). Es independiente del manifest, y dos
+workers no pueden compartir scope — solo puede haber un registro por scope, así que el
+segundo pisaría al primero. Push de Kanban intacto.
+
+**Pendiente de confirmar:** si iOS respeta el `id` y mantiene los dos iconos separados. Si
+no lo hace, el plan acordado con Jorge es colapsar a una sola PWA (`start_url` `/`, un
+único icono "jorgerente") y llegar a los módulos desde la página madre y el selector.
+
+**Alternativas consideradas:** una sola PWA desde el principio (funciona seguro, pero un
+toque más para llegar a cada módulo y se pierden los iconos por app); dejarlo como estaba y
+aceptar la barra del navegador al cambiar de app (descartado: el selector es precisamente
+la forma de moverse entre módulos).
