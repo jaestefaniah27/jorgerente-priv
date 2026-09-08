@@ -193,10 +193,10 @@ jornada olvidada queda cerrada la próxima vez que se abra la app, con la hora c
 | Método | Ruta | Cuerpo | Respuesta |
 |---|---|---|---|
 | GET | `/api/fichar/state` | — | `{ session, today, week, hasAutoClosed }` |
-| POST | `/api/fichar/clock-in` | — | `201 { session }` |
-| POST | `/api/fichar/clock-out` | — | `200 { session }` |
-| POST | `/api/fichar/break/start` | — | `201 { break }` |
-| POST | `/api/fichar/break/stop` | — | `200 { break }` |
+| POST | `/api/fichar/clock-in` | `{ pressed_ms_ago? }` | `201 { session }` |
+| POST | `/api/fichar/clock-out` | `{ pressed_ms_ago? }` | `200 { session }` |
+| POST | `/api/fichar/break/start` | `{ pressed_ms_ago? }` | `201 { break }` |
+| POST | `/api/fichar/break/stop` | `{ pressed_ms_ago? }` | `200 { break }` |
 | GET | `/api/fichar/week?start=YYYY-MM-DD` | — | `{ start, end, days, totals }` |
 | PATCH | `/api/fichar/sessions/[id]` | `{ started_at?, ended_at? }` | `200 { session }` |
 | DELETE | `/api/fichar/sessions/[id]` | — | `200 { ok: true }` |
@@ -210,9 +210,14 @@ Detalle:
   `week` = `Totals` de la semana en curso. `hasAutoClosed` = `true` si hay alguna sesión
   con `auto_closed = 1` en los últimos 7 días (dispara el aviso de la UI).
 - **`POST /clock-in`**: `400 "Ya tienes una jornada abierta"` si existe una sin cerrar.
-  Crea con `started_at = ahora`, `local_date = localDate(ahora)`.
+  Crea con `started_at = ahora - pressed_ms_ago`, `local_date = localDate(started_at)`.
 - **`POST /clock-out`**: `400 "No tienes ninguna jornada abierta"` si no hay.
-  Cierra también cualquier descanso abierto, con el mismo instante.
+  `ended_at = ahora - pressed_ms_ago`. Cierra también cualquier descanso abierto, con el
+  mismo instante.
+- **`pressed_ms_ago`** (opcional, en los cuatro POST): entero de milisegundos, aceptado solo
+  si `0 <= n <= 10000`; en cualquier otro caso (ausente, no numérico, fuera de rango) se usa
+  `ahora` sin devolver error. Compensa los 2 s del mantenido — ver "Botones de mantener
+  pulsado".
 - **`POST /break/start`**: `400` si no hay jornada abierta, o si ya hay un descanso abierto.
 - **`POST /break/stop`**: `400` si no hay descanso abierto.
 - **`GET /week`**: `start` debe ser lunes (`400 "start debe ser un lunes"` si no).
@@ -322,9 +327,57 @@ Además, al recuperar el foco la pestaña (`visibilitychange` → visible) se vu
 En descanso, el contador grande de "efectivo" se queda quieto (es correcto: el efectivo
 no avanza) y la tarjeta de DESCANSO se resalta en ámbar para que se vea de un vistazo.
 
-Todos los botones se deshabilitan mientras hay una petición en vuelo, y el estado se
-refresca con la respuesta del servidor (nunca optimista: fichar mal es peor que esperar
-200 ms).
+Los botones se deshabilitan mientras hay una petición en vuelo. La actualización de la UI
+sí es optimista, pero **solo una vez completado el gesto**: en cuanto el aro llega a los 2 s
+se pinta el estado nuevo y la petición viaja en paralelo, así que no se percibe espera. Si el
+servidor responde con error, se revierte y se muestra el mensaje.
+
+### Botones de mantener pulsado
+
+Fichar entrada, fichar salida y descanso se activan **manteniendo pulsado 2 segundos**, no
+con un toque suelto. Mientras se mantiene, un aro de progreso recorre el borde del botón; al
+completarse, se ficha.
+
+Componente único `src/components/fichar/HoldButton.tsx`, reutilizado por los dos botones:
+props `{ label, onComplete, holdMs = 2000, variant, disabled }`.
+
+Mecánica:
+
+- Eventos **pointer** (`pointerdown`, `pointerup`, `pointercancel`, `pointerleave`): cubren
+  ratón y táctil con el mismo código. `setPointerCapture` en el `pointerdown` para no perder
+  el gesto si el dedo se desplaza un poco.
+- El aro es un `<svg>` con un `<circle>`, `stroke-dasharray` = perímetro, animando
+  `stroke-dashoffset` desde `requestAnimationFrame` — no una transición CSS, porque al soltar
+  tiene que poder rebobinar al instante.
+- Soltar antes de tiempo: el aro rebobina en ~150 ms y no pasa nada más. Sin petición y sin
+  mensaje de error: no ha sido un fallo, ha sido no hacerlo.
+- Al completar: `navigator.vibrate?.(30)` (Android vibra, iOS lo ignora sin romperse) y
+  `onComplete(pressedMsAgo)`.
+- **Obligatorio para el móvil**: `touch-action: none`, `user-select: none`,
+  `-webkit-touch-callout: none` y `e.preventDefault()` en el `pointerdown`. Sin esto, en el
+  Safari del iPhone un mantenido abre el menú contextual y selecciona el texto del botón.
+- Teclado: `Enter` o `Space` sobre el botón enfocado lo activan directamente, sin mantener.
+  El hold protege de toques accidentales en el bolsillo; con teclado eso no aplica.
+- Las tres tarjetas de contador **no** llevan hold: son un toque normal, no tienen consecuencia.
+
+### Por qué no se manda la petición antes de completar el gesto
+
+Se valoró lanzar la petición al empezar a pulsar y cancelarla al soltar. Se descarta:
+
+- **No hay retraso que ahorrar.** La UI se actualiza al completarse el aro sin esperar al
+  servidor, y la petición viaja en paralelo. No se percibe espera igualmente.
+- **Se arriesga un fichaje fantasma.** Si se crea la jornada al empezar a pulsar y la
+  cancelación no llega (pestaña cerrada, móvil bloqueado, wifi caído en ese segundo), queda
+  una jornada abierta falsa en el registro. Cambiar integridad de datos por cero milisegundos
+  es mal negocio, y ese es justo el fallo más molesto posible aquí. Añade además carreras
+  entre crear y cancelar con doble pulsación.
+- **La conexión ya está caliente**: la página hizo `GET /state` al cargar, el keep-alive ya
+  está establecido. No hay nada que precalentar.
+
+Lo que sí se hace, y resuelve el fondo del asunto: **el fichaje se registra con el instante en
+que empezó la pulsación, no con el que terminó.** El cliente manda `pressed_ms_ago` y el
+servidor calcula `ahora - pressed_ms_ago`. Se manda una duración y no una fecha absoluta a
+propósito: así un reloj desajustado en el móvil da igual.
 
 ### Historial
 
@@ -407,6 +460,10 @@ con DB de usar y tirar. Casos mínimos:
 13. `PATCH /breaks/:id` con un rango fuera de su sesión → 400.
 14. `DELETE /sessions/:id` → 200, y sus descansos desaparecen.
 15. `GET /api/kanban/tasks` sigue devolviendo 200 (no hemos roto el otro módulo).
+16. `POST /clock-in` con `{ pressed_ms_ago: 2000 }` → `started_at` cae ~2 s antes de la
+    respuesta (margen de ±1 s).
+17. `POST /clock-in` con `pressed_ms_ago` inválido (`-5`, `999999`, `"abc"`, `null`) → 201 y
+    `started_at` ≈ ahora; nunca un 400.
 
 ### `tests/fichar-unit.test.mjs` (nuevo)
 
@@ -436,16 +493,20 @@ Playwright con el Chromium ya instalado, mismo arranque que `tests/ui.test.mjs`
    siempre con `Promise.race` contra un timeout para que una regresión falle en vez de
    colgar el test).
 3. Estado inicial: se ve `Fichar entrada`, el contador grande a `00:00:00`.
-4. Click en `Fichar entrada` → aparece `Fichar salida` y `Descanso`; tras esperar ~2s el
-   contador de oficina ya no es `00:00:00`.
-5. Click en `Descanso` → el botón pasa a `Terminar descanso`; el contador de descanso avanza.
-6. Click en `Terminar descanso` → vuelve a `Descanso`.
-7. Cambiar el contador grande: click en la tarjeta `OFICINA` → la etiqueta del grande pasa
-   a `OFICINA`; recargar la página → sigue en `OFICINA` (localStorage).
-8. Click en `Fichar salida` → vuelve `Fichar entrada`.
-9. Abrir `Historial` → se ve la semana actual y el día de hoy con la jornada recién creada;
-   `‹` cambia de semana y `›` vuelve.
-10. Sin errores de consola en todo el flujo.
+4. **Un toque suelto no ficha**: `page.click()` sobre `Fichar entrada` y, 500 ms después, el
+   botón sigue siendo `Fichar entrada`.
+5. **Soltar antes de tiempo tampoco ficha**: `pointerdown`, esperar 800 ms, `pointerup` → el
+   botón sigue igual y `GET /state` devuelve `session: null`.
+6. Helper `hold(locator)` = `pointerdown` + esperar `2300` ms + `pointerup`. `hold` sobre
+   `Fichar entrada` → aparecen `Fichar salida` y `Descanso`, y el contador de oficina avanza.
+7. `hold` sobre `Descanso` → pasa a `Terminar descanso` y el contador de descanso avanza;
+   `hold` otra vez → vuelve a `Descanso`.
+8. Cambiar el contador grande: click **normal** en la tarjeta `OFICINA` (las tarjetas no
+   llevan hold) → la etiqueta del grande pasa a `OFICINA`; recargar → sigue en `OFICINA`.
+9. `hold` sobre `Fichar salida` → vuelve `Fichar entrada`.
+10. Abrir `Historial` → se ve la semana actual y el día de hoy con la jornada recién creada;
+    `‹` cambia de semana y `›` vuelve.
+11. Sin errores de consola en todo el flujo.
 
 ## Orden de ejecución
 
@@ -459,8 +520,9 @@ Cada paso termina con su verificación. No pasar al siguiente con algo en rojo.
    `ServiceWorkerRegister`). → `node tests/ui.test.mjs` (los de Kanban, **sin tocarlos**)
    debe seguir en verde: 24 passed.
 4. **PWA de fichar**: manifest, iconos, `sw.js`, header en `next.config.ts`.
-5. **UI**: `layout.tsx`, `page.tsx`, `ClockPage.tsx`, `HistoryModal.tsx`.
-   → `node tests/fichar-ui.test.mjs`.
+5. **UI**: `layout.tsx`, `page.tsx`, `HoldButton.tsx`, `ClockPage.tsx`, `HistoryModal.tsx`.
+   → `node tests/fichar-ui.test.mjs`. Probar el mantenido a mano en el móvil además del test:
+   que no salga el menú contextual de iOS ni se seleccione el texto del botón.
 6. **Suite completa** contra DB limpia: `api` (44) + `ui` (24) + `fichar-api` +
    `fichar-unit` + `fichar-ui` + `reminder-worker` (7) + `push-delivery` (5).
 7. **Docs**: actualizar `docs/overview.md` (mencionar el módulo nuevo) y añadir un ADR
