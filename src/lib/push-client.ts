@@ -72,12 +72,25 @@ export async function subscribeToPush(): Promise<
       15000,
       "El service worker no se activó a tiempo. Recarga la página e inténtalo de nuevo."
     );
-    let subscription = await registration.pushManager.getSubscription();
+    let subscription = await withTimeout(
+      registration.pushManager.getSubscription(),
+      10000,
+      "El navegador no respondió al comprobar la suscripción existente. Recarga la página e inténtalo de nuevo."
+    );
     if (!subscription) {
-      subscription = await registration.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(keyData.publicKey) as unknown as BufferSource,
-      });
+      // The actual subscribe() call — right after granting permission — is
+      // the step known to hang indefinitely in Safari (a long-standing
+      // WebKit issue: it neither resolves nor rejects under some
+      // conditions). This is the step Jorge hit: permission granted, then
+      // stuck on "Comprobando…" with nothing ever happening.
+      subscription = await withTimeout(
+        registration.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array(keyData.publicKey) as unknown as BufferSource,
+        }),
+        15000,
+        "Safari no completó la suscripción a notificaciones push a tiempo (es un fallo conocido de WebKit). Prueba a recargar la página y a repetirlo; si sigue sin funcionar, puede ser una limitación de Safari en este equipo."
+      );
     }
     await fetch("/api/kanban/push/subscribe", {
       method: "POST",
