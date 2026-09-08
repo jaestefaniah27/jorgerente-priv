@@ -7,7 +7,8 @@ Decisiones cerradas para la primera versión del módulo Kanban (`/kanban`). Ver
 - Vista global adicional que agrega tareas de todos los tableros, filtrable por proyecto(s), épica, prioridad.
 
 ## Columnas
-- Fijas e iguales en todos los tableros: **To Do / En progreso / Hecho**. No configurables en v1.
+- Fijas e iguales en todos los tableros: **Backlog / To Do / En progreso / Hecho**. No configurables en v1.
+- Backlog es el estado por defecto de una tarea nueva: ahí se apilan antes de entrar en flujo activo. El botón "+ Nueva tarea" (que abre un formulario completo, no un campo suelto) solo aparece en la columna Backlog dentro de un tablero; desde ese formulario se puede marcar la casilla "Enviar directamente a To Do" para saltarse el Backlog en la creación. La vista global tiene su propio botón "+ Nueva tarea" equivalente (con selector de proyecto) que abre el mismo formulario.
 
 ## Épicas
 - Pertenecen a un proyecto (tablero); una tarea solo puede colgar de una épica de su mismo proyecto.

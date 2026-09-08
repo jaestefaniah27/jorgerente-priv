@@ -5,6 +5,7 @@ import type { Epic, Project, Status, TaskWithExtras } from "@/lib/types";
 import { STATUSES, STATUS_LABELS } from "@/lib/types";
 import TaskCard from "./TaskCard";
 import TaskDetailModal from "./TaskDetailModal";
+import NewTaskModal from "./NewTaskModal";
 
 export default function Board({
   project,
@@ -18,45 +19,16 @@ export default function Board({
   const [tasks, setTasks] = useState<TaskWithExtras[]>(initialTasks);
   const [epics, setEpics] = useState<Epic[]>(initialEpics);
   const [openTask, setOpenTask] = useState<TaskWithExtras | null>(null);
-  const [newTitleByStatus, setNewTitleByStatus] = useState<Record<Status, string>>({
-    todo: "",
-    in_progress: "",
-    done: "",
-  });
+  const [showNewTask, setShowNewTask] = useState(false);
   const [draggedId, setDraggedId] = useState<number | null>(null);
   const [showEpicForm, setShowEpicForm] = useState(false);
   const [newEpicName, setNewEpicName] = useState("");
 
   const columns = useMemo(() => {
-    const map: Record<Status, TaskWithExtras[]> = { todo: [], in_progress: [], done: [] };
+    const map: Record<Status, TaskWithExtras[]> = { backlog: [], todo: [], in_progress: [], done: [] };
     for (const t of tasks) map[t.status].push(t);
     return map;
   }, [tasks]);
-
-  async function createTask(status: Status) {
-    const title = newTitleByStatus[status].trim();
-    if (!title) return;
-    const res = await fetch("/api/kanban/tasks", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ project_id: project.id, title, status }),
-    });
-    const data = await res.json();
-    if (res.ok) {
-      setTasks((prev) => [
-        {
-          ...data.task,
-          project_name: project.name,
-          project_color: project.color,
-          epic_name: null,
-          epic_color: null,
-          time_spent_minutes: 0,
-        },
-        ...prev,
-      ]);
-      setNewTitleByStatus((prev) => ({ ...prev, [status]: "" }));
-    }
-  }
 
   async function moveTask(task: TaskWithExtras, direction: -1 | 1) {
     const idx = STATUSES.indexOf(task.status);
@@ -142,7 +114,7 @@ export default function Board({
         </div>
       )}
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {STATUSES.map((status) => (
           <div
             key={status}
@@ -154,26 +126,20 @@ export default function Board({
               <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-600">
                 {STATUS_LABELS[status]}
               </h2>
-              <span className="text-xs text-slate-400">{columns[status].length}</span>
-            </div>
-
-            <div className="mb-3 flex gap-1">
-              <input
-                className="flex-1 rounded border border-slate-300 bg-white px-2 py-1 text-sm"
-                placeholder="+ nueva tarea"
-                value={newTitleByStatus[status]}
-                onChange={(e) => setNewTitleByStatus((prev) => ({ ...prev, [status]: e.target.value }))}
-                onKeyDown={(e) => e.key === "Enter" && createTask(status)}
-              />
-              <button
-                type="button"
-                onClick={() => createTask(status)}
-                disabled={!newTitleByStatus[status].trim()}
-                className="rounded bg-slate-800 px-2 py-1 text-sm text-white disabled:opacity-30"
-                aria-label="Añadir tarea"
-              >
-                +
-              </button>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-slate-400">{columns[status].length}</span>
+                {status === "backlog" && (
+                  <button
+                    type="button"
+                    onClick={() => setShowNewTask(true)}
+                    className="rounded bg-slate-800 px-2 py-0.5 text-sm text-white hover:bg-slate-700"
+                    aria-label="Nueva tarea"
+                    title="Nueva tarea"
+                  >
+                    +
+                  </button>
+                )}
+              </div>
             </div>
 
             <div className="space-y-2">
@@ -187,10 +153,24 @@ export default function Board({
                   onDragStart={(t) => setDraggedId(t.id)}
                 />
               ))}
+              {columns[status].length === 0 && (
+                <p className="text-xs text-slate-400">Sin tareas.</p>
+              )}
             </div>
           </div>
         ))}
       </div>
+
+      {showNewTask && (
+        <NewTaskModal
+          projects={[project]}
+          epics={epics}
+          defaultProjectId={project.id}
+          lockProject
+          onClose={() => setShowNewTask(false)}
+          onCreated={(task) => setTasks((prev) => [task, ...prev])}
+        />
+      )}
 
       {openTask && (
         <TaskDetailModal

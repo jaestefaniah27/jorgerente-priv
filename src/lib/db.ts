@@ -42,7 +42,7 @@ CREATE TABLE IF NOT EXISTS tasks (
   title TEXT NOT NULL,
   description TEXT NOT NULL DEFAULT '',
   priority TEXT NOT NULL DEFAULT 'medium' CHECK(priority IN ('low','medium','high','urgent')),
-  status TEXT NOT NULL DEFAULT 'todo' CHECK(status IN ('todo','in_progress','done')),
+  status TEXT NOT NULL DEFAULT 'backlog' CHECK(status IN ('backlog','todo','in_progress','done')),
   estimate_minutes INTEGER,
   due_at TEXT,
   reminder_offset_minutes INTEGER,
@@ -75,9 +75,47 @@ CREATE INDEX IF NOT EXISTS idx_tasks_reminder ON tasks(reminder_at, reminder_sen
 CREATE INDEX IF NOT EXISTS idx_time_entries_task ON time_entries(task_id);
 `;
 
+// Adds the 'backlog' status to the tasks table's CHECK constraint. SQLite
+// can't ALTER a CHECK constraint in place, so this rebuilds the table when
+// an older schema (without 'backlog') is detected — renaming it aside,
+// creating the new table, copying every row across unchanged, then
+// dropping the old one (which also drops its now-orphaned indexes, since
+// SQLite ties indexes to the table they were built on; ensureSchema's
+// CREATE INDEX IF NOT EXISTS calls below recreate them on the new table).
+// Runs once at startup; a no-op on a fresh or already-migrated database.
+function migrateBacklogStatus() {
+  const row = db
+    .prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'tasks'")
+    .get() as { sql: string } | undefined;
+  if (!row || row.sql.includes("'backlog'")) return;
+
+  db.exec("ALTER TABLE tasks RENAME TO tasks_pre_backlog_migration");
+  db.exec(`
+    CREATE TABLE tasks (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+      epic_id INTEGER REFERENCES epics(id) ON DELETE SET NULL,
+      title TEXT NOT NULL,
+      description TEXT NOT NULL DEFAULT '',
+      priority TEXT NOT NULL DEFAULT 'medium' CHECK(priority IN ('low','medium','high','urgent')),
+      status TEXT NOT NULL DEFAULT 'backlog' CHECK(status IN ('backlog','todo','in_progress','done')),
+      estimate_minutes INTEGER,
+      due_at TEXT,
+      reminder_offset_minutes INTEGER,
+      reminder_at TEXT,
+      reminder_sent_at TEXT,
+      created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+      updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+    )
+  `);
+  db.exec("INSERT INTO tasks SELECT * FROM tasks_pre_backlog_migration");
+  db.exec("DROP TABLE tasks_pre_backlog_migration");
+}
+
 let migrated = false;
 export function ensureSchema() {
   if (migrated) return;
+  migrateBacklogStatus();
   db.exec(SCHEMA_SQL);
   migrated = true;
 }

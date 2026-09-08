@@ -73,8 +73,15 @@ async function main() {
   });
   ok(r.status === 201, `create task -> 201 (got ${r.status})`);
   const task = r.json.task;
-  ok(task.status === "todo", "new task defaults to todo");
+  ok(task.status === "backlog", "new task defaults to backlog");
   ok(task.priority === "high", "task priority saved");
+
+  r = await api("POST", "/api/kanban/tasks", {
+    project_id: project.id,
+    title: "Directo a To Do",
+    status: "todo",
+  });
+  ok(r.status === 201 && r.json.task.status === "todo", "task can be created straight into todo");
 
   r = await api("POST", "/api/kanban/tasks", { project_id: project.id, title: "" });
   ok(r.status === 400, `create task with empty title -> 400 (got ${r.status})`);

@@ -1,8 +1,8 @@
 export type Priority = "low" | "medium" | "high" | "urgent";
-export type Status = "todo" | "in_progress" | "done";
+export type Status = "backlog" | "todo" | "in_progress" | "done";
 
 export const PRIORITIES: Priority[] = ["low", "medium", "high", "urgent"];
-export const STATUSES: Status[] = ["todo", "in_progress", "done"];
+export const STATUSES: Status[] = ["backlog", "todo", "in_progress", "done"];
 
 export const PRIORITY_LABELS: Record<Priority, string> = {
   low: "Baja",
@@ -12,20 +12,24 @@ export const PRIORITY_LABELS: Record<Priority, string> = {
 };
 
 export const STATUS_LABELS: Record<Status, string> = {
+  backlog: "Backlog",
   todo: "To Do",
   in_progress: "En progreso",
   done: "Hecho",
 };
 
-// Preset reminder offsets, in minutes before the due date.
-export const REMINDER_OFFSETS = [
-  { minutes: 15, label: "15 minutos antes" },
+// New tasks land here by default (see NewTaskModal) unless explicitly sent
+// straight to To Do.
+export const DEFAULT_NEW_TASK_STATUS: Status = "backlog";
+
+export const REMINDER_OFFSETS: { minutes: number; label: string }[] = [
+  { minutes: 10, label: "10 minutos antes" },
+  { minutes: 30, label: "30 minutos antes" },
   { minutes: 60, label: "1 hora antes" },
   { minutes: 180, label: "3 horas antes" },
   { minutes: 1440, label: "1 día antes" },
   { minutes: 2880, label: "2 días antes" },
-  { minutes: 10080, label: "1 semana antes" },
-] as const;
+];
 
 export interface Project {
   id: number;

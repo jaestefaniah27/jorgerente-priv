@@ -7,7 +7,7 @@ import { PRIORITIES, PRIORITY_LABELS, STATUSES, STATUS_LABELS } from "@/lib/type
 import TaskCard from "@/components/TaskCard";
 import TaskDetailModal from "@/components/TaskDetailModal";
 import NewProjectForm from "@/components/NewProjectForm";
-import NewTaskForm from "@/components/NewTaskForm";
+import NewTaskModal from "@/components/NewTaskModal";
 
 type EpicWithProject = Epic & { project_name: string };
 
@@ -22,6 +22,7 @@ export default function GlobalView({
   const [tasks, setTasks] = useState<TaskWithExtras[]>(initialTasks);
   const [allEpics, setAllEpics] = useState<EpicWithProject[]>([]);
   const [openTask, setOpenTask] = useState<TaskWithExtras | null>(null);
+  const [showNewTask, setShowNewTask] = useState(false);
 
   const [selectedProjects, setSelectedProjects] = useState<number[]>([]);
   const [selectedEpic, setSelectedEpic] = useState<string>("");
@@ -52,7 +53,7 @@ export default function GlobalView({
   );
 
   const columns = useMemo(() => {
-    const map: Record<Status, TaskWithExtras[]> = { todo: [], in_progress: [], done: [] };
+    const map: Record<Status, TaskWithExtras[]> = { backlog: [], todo: [], in_progress: [], done: [] };
     for (const t of tasks) map[t.status].push(t);
     return map;
   }, [tasks]);
@@ -81,10 +82,12 @@ export default function GlobalView({
         <h1 className="text-xl font-semibold text-slate-900">Vista global</h1>
         <div className="flex flex-wrap gap-2">
           {projects.length > 0 && (
-            <NewTaskForm
-              projects={projects}
-              onCreated={(t: TaskWithExtras) => setTasks((prev) => [t, ...prev])}
-            />
+            <button
+              onClick={() => setShowNewTask(true)}
+              className="rounded-lg border border-dashed border-slate-300 px-3 py-2 text-sm text-slate-600 hover:border-indigo-300 hover:text-indigo-700"
+            >
+              + Nueva tarea
+            </button>
           )}
           <NewProjectForm onCreated={(p) => setProjects((prev) => [...prev, p])} />
         </div>
@@ -179,7 +182,7 @@ export default function GlobalView({
             )}
           </div>
 
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {STATUSES.map((status) => (
               <div key={status} className="rounded-lg bg-slate-100 p-3">
                 <div className="mb-3 flex items-center justify-between">
@@ -200,6 +203,15 @@ export default function GlobalView({
             ))}
           </div>
         </>
+      )}
+
+      {showNewTask && (
+        <NewTaskModal
+          projects={projects}
+          epics={allEpics}
+          onClose={() => setShowNewTask(false)}
+          onCreated={(task) => setTasks((prev) => [task, ...prev])}
+        />
       )}
 
       {openTask && (

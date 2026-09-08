@@ -23,7 +23,7 @@ function ok(cond, msg) {
 
 async function main() {
   const browser = await chromium.launch({
-    executablePath: process.env.CHROMIUM_PATH || "/opt/pw-browsers/chromium-1194/chrome-linux/chrome",
+    executablePath: "/opt/pw-browsers/chromium-1194/chrome-linux/chrome",
     args: ["--no-sandbox"],
   });
   const consoleErrors = [];
@@ -68,15 +68,50 @@ async function main() {
   await page.waitForSelector('nav >> text=MX-5');
 
   // --- Go to the board and create a task ---------------------------------
-  await page.getByRole("link", { name: /MX-5/ }).click();
+  // Two links to the same board exist (the top nav pill, and the "Tus
+  // tableros" card in the global view) — scope to the nav to disambiguate.
+  await page.locator("nav").getByRole("link", { name: /MX-5/ }).click();
   await page.waitForURL(/\/kanban\/board\/\d+/);
   ok((await page.locator("h1", { hasText: "MX-5" }).count()) >= 1, "board page shows project name");
 
-  const todoInput = page.locator('input[placeholder="+ nueva tarea"]').first();
-  await todoInput.fill("Buscar coches en Alemania");
-  await todoInput.press("Enter");
-  await page.waitForSelector("text=Buscar coches en Alemania");
-  ok(true, "task created via quick-add in To Do column");
+  // Only the Backlog column has an "add task" button — clicking it opens
+  // the full creation modal (title, priority, epic, estimate, due date +
+  // reminder, and the "send straight to To Do" checkbox).
+  ok(
+    (await page.locator('input[placeholder="+ nueva tarea"]').count()) === 0,
+    "no inline quick-add input remains on any column"
+  );
+  await page.getByRole("button", { name: "Nueva tarea" }).click();
+  await page.waitForSelector("text=Nueva tarea", { state: "visible" });
+  await page.getByLabel("Título").fill("Buscar coches en Alemania");
+  await page.getByRole("button", { name: "Crear tarea" }).click();
+  await page.waitForSelector("text=Nueva tarea", { state: "detached" });
+  ok(true, "task created via the Backlog 'Nueva tarea' modal");
+
+  const backlogColumn = page.locator("text=BACKLOG").locator("..").locator("..");
+  ok(
+    (await backlogColumn.getByText("Buscar coches en Alemania").count()) === 1,
+    "task lands in Backlog by default (checkbox left unchecked)"
+  );
+
+  // Also verify the "send straight to To Do" checkbox works.
+  await page.getByRole("button", { name: "Nueva tarea" }).click();
+  await page.waitForSelector("text=Nueva tarea", { state: "visible" });
+  await page.getByLabel("Título").fill("Tarea directa a To Do");
+  await page.getByText("Enviar directamente a To Do").click();
+  await page.getByRole("button", { name: "Crear tarea" }).click();
+  await page.waitForSelector("text=Nueva tarea", { state: "detached" });
+  const todoColumnCheck = page.locator("h2", { hasText: "To Do" }).locator("..").locator("..");
+  ok(
+    (await todoColumnCheck.getByText("Tarea directa a To Do").count()) === 1,
+    "checkbox sends the task straight to To Do instead of Backlog"
+  );
+
+  // Move the main test task from Backlog into To Do with the arrow button
+  // before exercising the rest of the edit flow.
+  const backlogCard = page.locator('[data-task-id]', { hasText: "Buscar coches en Alemania" });
+  await backlogCard.getByRole("button", { name: "→" }).click();
+  await page.waitForTimeout(300);
 
   // --- Open task, edit priority + due date + reminder, save --------------
   await page.getByText("Buscar coches en Alemania").click();

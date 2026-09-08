@@ -8,7 +8,7 @@ import {
   requireString,
 } from "@/lib/api-helpers";
 import { computeReminderAt } from "@/lib/reminders";
-import { PRIORITIES, STATUSES, type Priority, type Status } from "@/lib/types";
+import { DEFAULT_NEW_TASK_STATUS, PRIORITIES, STATUSES, type Priority, type Status } from "@/lib/types";
 
 function parseListParam(value: string | null): number[] | null {
   if (!value) return null;
@@ -86,7 +86,7 @@ export async function POST(req: NextRequest) {
     const description = optionalString(body, "description") || "";
     const priority = (optionalString(body, "priority") || "medium") as Priority;
     if (!PRIORITIES.includes(priority)) throw new ApiError(400, "Prioridad inválida");
-    const status = (optionalString(body, "status") || "todo") as Status;
+    const status = (optionalString(body, "status") || DEFAULT_NEW_TASK_STATUS) as Status;
     if (!STATUSES.includes(status)) throw new ApiError(400, "Estado inválido");
 
     let epicId = optionalNumber(body, "epic_id");
