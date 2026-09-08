@@ -239,7 +239,8 @@ export default function ClockPage({ initial }: { initial: ClockState }) {
         {onBreak && <p className="mt-2 text-sm font-medium text-amber-600">En descanso</p>}
       </div>
 
-      <div className="mt-9 flex flex-col items-center gap-3">
+      {/* Roomy gap: the progress ring is drawn outside each button. */}
+      <div className="mt-9 flex flex-col items-center gap-7">
         {state.session ? (
           <HoldButton
             label="Fichar salida"

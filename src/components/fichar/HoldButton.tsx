@@ -6,11 +6,14 @@ const REWIND_MS = 150;
 
 export type HoldVariant = "in" | "out" | "break" | "breakActive";
 
+// The ring is drawn OUTSIDE the button, so its colour has to contrast with the
+// page background rather than with the button fill — that way it reads the
+// same whichever variant is on screen.
 const VARIANTS: Record<HoldVariant, { button: string; ring: string }> = {
-  in: { button: "bg-indigo-600 text-white hover:bg-indigo-500", ring: "#c7d2fe" },
-  out: { button: "bg-slate-800 text-white hover:bg-slate-700", ring: "#94a3b8" },
+  in: { button: "bg-indigo-600 text-white hover:bg-indigo-500", ring: "#4f46e5" },
+  out: { button: "bg-slate-800 text-white hover:bg-slate-700", ring: "#334155" },
   break: { button: "border-2 border-amber-400 bg-white text-amber-700 hover:bg-amber-50", ring: "#f59e0b" },
-  breakActive: { button: "bg-amber-500 text-white hover:bg-amber-400", ring: "#fde68a" },
+  breakActive: { button: "bg-amber-500 text-white hover:bg-amber-400", ring: "#d97706" },
 };
 
 // Press-and-hold button: a progress ring traces the border while held, and the
@@ -106,7 +109,8 @@ export default function HoldButton({
   }, [rewind]);
 
   const styles = VARIANTS[variant];
-  const pad = size === "lg" ? "px-10 py-5 text-lg" : "px-6 py-3 text-sm";
+  // Fixed square boxes, so rounded-full gives a true circle rather than a pill.
+  const box = size === "lg" ? "h-40 w-40 text-base" : "h-32 w-32 text-sm";
 
   return (
     <button
@@ -132,25 +136,30 @@ export default function HoldButton({
         }
       }}
       style={{ touchAction: "none", WebkitTouchCallout: "none", userSelect: "none" }}
-      className={`relative select-none rounded-full font-semibold shadow-sm transition-colors disabled:opacity-50 ${styles.button} ${pad}`}
+      className={`relative flex select-none items-center justify-center rounded-full px-4 text-center font-semibold leading-tight shadow-sm transition-colors disabled:opacity-50 ${styles.button} ${box}`}
     >
-      {/* pathLength normalises the outline to 1 so the ring fills correctly at
-          any button size, with no measuring. */}
+      {/* The button box is square, so a 0 0 100 100 viewBox maps to it without
+          distortion and the ring is a real circle. r > 50 puts it just outside
+          the button (hence overflow-visible), where it reads clearly instead of
+          washing out against the fill. pathLength normalises the circumference
+          to 1, so the fill works at any size with no measuring, and the
+          rotation starts it at twelve o'clock. */}
       <svg
         aria-hidden
-        className="pointer-events-none absolute inset-0 h-full w-full overflow-visible"
-        preserveAspectRatio="none"
+        viewBox="0 0 100 100"
+        className="pointer-events-none absolute inset-0 h-full w-full -rotate-90 overflow-visible"
       >
-        <rect
-          x="0"
-          y="0"
-          width="100%"
-          height="100%"
-          rx="9999"
-          ry="9999"
+        {progress > 0 && (
+          // Faint full circle behind the arc, so how much is left is visible.
+          <circle cx="50" cy="50" r="54" fill="none" stroke={styles.ring} strokeWidth="4" opacity="0.2" />
+        )}
+        <circle
+          cx="50"
+          cy="50"
+          r="54"
           fill="none"
           stroke={styles.ring}
-          strokeWidth="3"
+          strokeWidth="4"
           strokeLinecap="round"
           pathLength={1}
           strokeDasharray={1}

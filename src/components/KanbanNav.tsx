@@ -31,18 +31,31 @@ export default function KanbanNav() {
   }, [pathname]);
 
   return (
-    <header className="border-b border-slate-200 bg-white">
-      <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-4 px-4 py-3">
-        <Link href="/kanban" className="text-lg font-semibold text-indigo-700">
-          jorgerente · Kanban
-        </Link>
-        <nav className="flex flex-wrap items-center gap-2 text-sm">
+    <header>
+      {/* Top band: identity and the controls that belong to the app as a
+          whole, not to any particular board. */}
+      <div className="border-b border-slate-200 bg-white">
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3">
+          <Link href="/kanban" className="text-lg font-semibold text-indigo-700">
+            jorgerente · Kanban
+          </Link>
+          <div className="flex items-center gap-3">
+            <NotificationsToggle />
+            <AppSwitcher />
+          </div>
+        </div>
+      </div>
+
+      {/* Second band: where you are inside Kanban. Kept separate so the board
+          links don't compete with the app-level controls above. */}
+      <div className="border-b border-slate-200 bg-slate-100">
+        <nav className="mx-auto flex max-w-6xl flex-wrap items-center gap-2 px-4 py-2 text-sm">
           <Link
             href="/kanban"
             className={`rounded-full px-3 py-1 ${
               pathname === "/kanban"
-                ? "bg-indigo-100 font-semibold text-indigo-700"
-                : "text-slate-600 hover:bg-slate-100"
+                ? "bg-white font-semibold text-indigo-700 shadow-sm"
+                : "text-slate-600 hover:bg-white/70"
             }`}
           >
             Vista global
@@ -53,8 +66,8 @@ export default function KanbanNav() {
               href={`/kanban/board/${p.id}`}
               className={`flex items-center gap-1.5 rounded-full px-3 py-1 ${
                 pathname === `/kanban/board/${p.id}`
-                  ? "bg-indigo-100 font-semibold text-indigo-700"
-                  : "text-slate-600 hover:bg-slate-100"
+                  ? "bg-white font-semibold text-indigo-700 shadow-sm"
+                  : "text-slate-600 hover:bg-white/70"
               }`}
             >
               <span
@@ -65,10 +78,6 @@ export default function KanbanNav() {
             </Link>
           ))}
         </nav>
-        <div className="ml-auto flex items-center gap-3">
-          <NotificationsToggle />
-          <AppSwitcher />
-        </div>
       </div>
     </header>
   );

@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import Link from "next/link";
 import ServiceWorkerRegister from "@/components/ServiceWorkerRegister";
 import AppSwitcher from "@/components/AppSwitcher";
 
@@ -25,12 +26,16 @@ export default function FicharLayout({ children }: { children: React.ReactNode }
   return (
     <div className="flex min-h-screen flex-col bg-slate-50 text-slate-900">
       <ServiceWorkerRegister basePath="/fichar" />
-      <nav className="border-b border-slate-200 bg-white">
-        <div className="mx-auto flex max-w-xl items-center justify-between px-4 py-3">
-          <span className="text-sm font-semibold text-slate-900">Fichar</span>
+      {/* Same top band as Kanban, so switching between modules doesn't feel
+          like landing in a different product. */}
+      <header className="border-b border-slate-200 bg-white">
+        <div className="mx-auto flex max-w-xl items-center justify-between gap-4 px-4 py-3">
+          <Link href="/fichar" className="text-lg font-semibold text-indigo-700">
+            jorgerente · Fichar
+          </Link>
           <AppSwitcher />
         </div>
-      </nav>
+      </header>
       <main className="flex-1">{children}</main>
     </div>
   );
