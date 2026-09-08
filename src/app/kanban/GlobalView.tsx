@@ -6,6 +6,7 @@ import { PRIORITIES, PRIORITY_LABELS, STATUSES, STATUS_LABELS } from "@/lib/type
 import TaskCard from "@/components/TaskCard";
 import TaskDetailModal from "@/components/TaskDetailModal";
 import NewProjectForm from "@/components/NewProjectForm";
+import NewTaskForm from "@/components/NewTaskForm";
 
 type EpicWithProject = Epic & { project_name: string };
 
@@ -77,7 +78,15 @@ export default function GlobalView({
     <div className="mx-auto max-w-6xl px-4 py-6">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-xl font-semibold text-slate-900">Vista global</h1>
-        <NewProjectForm onCreated={(p) => setProjects((prev) => [...prev, p])} />
+        <div className="flex flex-wrap gap-2">
+          {projects.length > 0 && (
+            <NewTaskForm
+              projects={projects}
+              onCreated={(t: TaskWithExtras) => setTasks((prev) => [t, ...prev])}
+            />
+          )}
+          <NewProjectForm onCreated={(p) => setProjects((prev) => [...prev, p])} />
+        </div>
       </div>
 
       {projects.length === 0 ? (

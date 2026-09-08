@@ -165,6 +165,15 @@ export default function Board({
                 onChange={(e) => setNewTitleByStatus((prev) => ({ ...prev, [status]: e.target.value }))}
                 onKeyDown={(e) => e.key === "Enter" && createTask(status)}
               />
+              <button
+                type="button"
+                onClick={() => createTask(status)}
+                disabled={!newTitleByStatus[status].trim()}
+                className="rounded bg-slate-800 px-2 py-1 text-sm text-white disabled:opacity-30"
+                aria-label="Añadir tarea"
+              >
+                +
+              </button>
             </div>
 
             <div className="space-y-2">
