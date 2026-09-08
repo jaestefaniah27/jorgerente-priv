@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import type { Epic, Priority, Project, Status, TaskWithExtras } from "@/lib/types";
 import { PRIORITIES, PRIORITY_LABELS, STATUSES, STATUS_LABELS } from "@/lib/types";
 import TaskCard from "@/components/TaskCard";
@@ -95,7 +96,32 @@ export default function GlobalView({
         </p>
       ) : (
         <>
+          <div className="mb-4">
+            <p className="mb-1.5 text-xs font-medium uppercase tracking-wide text-slate-400">
+              Tus tableros
+            </p>
+            <div className="flex flex-wrap gap-1.5">
+              {projects.map((p) => (
+                <Link
+                  key={p.id}
+                  href={`/kanban/board/${p.id}`}
+                  className="flex items-center gap-1.5 rounded-full border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 shadow-sm hover:border-indigo-300 hover:text-indigo-700"
+                >
+                  <span
+                    className="inline-block h-2 w-2 rounded-full"
+                    style={{ backgroundColor: p.color }}
+                  />
+                  {p.name}
+                  <span aria-hidden className="text-slate-400">
+                    →
+                  </span>
+                </Link>
+              ))}
+            </div>
+          </div>
+
           <div className="mb-4 flex flex-wrap items-center gap-3 rounded-lg border border-slate-200 bg-white p-3 text-sm">
+            <span className="text-xs text-slate-400">Filtrar por proyecto:</span>
             <div className="flex flex-wrap gap-1.5">
               {projects.map((p) => (
                 <button

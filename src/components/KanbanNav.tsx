@@ -35,10 +35,14 @@ export default function KanbanNav() {
         <Link href="/kanban" className="text-lg font-semibold text-indigo-700">
           jorgerente · Kanban
         </Link>
-        <nav className="flex flex-wrap items-center gap-3 text-sm">
+        <nav className="flex flex-wrap items-center gap-2 text-sm">
           <Link
             href="/kanban"
-            className={pathname === "/kanban" ? "font-semibold text-indigo-700" : "text-slate-600 hover:text-indigo-700"}
+            className={`rounded-full px-3 py-1 ${
+              pathname === "/kanban"
+                ? "bg-indigo-100 font-semibold text-indigo-700"
+                : "text-slate-600 hover:bg-slate-100"
+            }`}
           >
             Vista global
           </Link>
@@ -46,14 +50,14 @@ export default function KanbanNav() {
             <Link
               key={p.id}
               href={`/kanban/board/${p.id}`}
-              className={
+              className={`flex items-center gap-1.5 rounded-full px-3 py-1 ${
                 pathname === `/kanban/board/${p.id}`
-                  ? "font-semibold text-indigo-700"
-                  : "text-slate-600 hover:text-indigo-700"
-              }
+                  ? "bg-indigo-100 font-semibold text-indigo-700"
+                  : "text-slate-600 hover:bg-slate-100"
+              }`}
             >
               <span
-                className="mr-1 inline-block h-2 w-2 rounded-full align-middle"
+                className="inline-block h-2 w-2 rounded-full"
                 style={{ backgroundColor: p.color }}
               />
               {p.name}
