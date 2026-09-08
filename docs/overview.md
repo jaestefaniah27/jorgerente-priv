@@ -1,16 +1,33 @@
 # Overview
 
 ## Qué es
-App personal de tablero Kanban + documentación, estilo Jira + Confluence, para que Jorge gestione sus proyectos personales (MX-5, teclado macro, TFM, PokerPoke, etc.) desde un único sitio en vez de repartidos entre notas, memoria de Claude y repos sueltos.
+App personal de Jorge: varios módulos bajo un único dominio, cada uno instalable como
+PWA independiente. Sustituye tener las cosas repartidas entre notas, memoria de Claude y
+repos sueltos.
 
-## Estado
-- **Kickoff (2026-09-07).** Infraestructura y metodología montadas; especificaciones funcionales pendientes.
-- Próximo paso: definir con Jorge las entidades y vistas de la app (tableros, tarjetas, espacios de documentación, etc.) y el stack técnico.
+## Módulos
 
-## Por decidir
-- Stack técnico (frontend/backend/BD).
-- Modelo de datos (proyectos, tableros, columnas, tarjetas, páginas de documentación, relaciones entre ellos).
-- Autenticación (¿solo Jorge, o multiusuario tipo María también?).
-- Alcance de la v1 vs. roadmap futuro.
+| Módulo | Path | Estado | Spec |
+|---|---|---|---|
+| Kanban | `/kanban` | En producción | [`kanban-spec.md`](kanban-spec.md) |
+| Fichar | `/fichar` | En producción | [`fichar-spec.md`](fichar-spec.md) |
+| Docs (estilo Confluence) | `/docs` | Sin empezar | — |
 
-Estas decisiones se irán registrando aquí y en `docs/decisions/` a medida que se tomen.
+- **Kanban**: un tablero por proyecto (Backlog / To Do / En progreso / Hecho) más una vista
+  global filtrable entre proyectos; épicas, prioridades, estimaciones, registro manual de
+  tiempo y avisos por Web Push con fecha límite.
+- **Fichar**: registro de jornada laboral. Botones de mantener pulsado para entrada, salida
+  y descanso; contadores en vivo de oficina / descanso / efectivo, totales semanales e
+  historial editable.
+
+## Stack
+Next.js (App Router) + SQLite (better-sqlite3), desplegado con PM2 tras nginx en el
+servidor Oracle de Jorge. Sin autenticación: instancia personal de un solo usuario.
+Ver [`infra.md`](infra.md) para servidor, dominio y despliegue, y
+[`workflow.md`](workflow.md) para cómo se trabaja en este repo.
+
+## Pendiente
+- Módulo de documentación (`/docs`).
+- Iconos propios para cada PWA (ahora `/fichar` reutiliza los del Kanban).
+- Posibles extras de Fichar aparcados en v1: aviso push para recordar fichar la salida y
+  objetivo de horas semanales.

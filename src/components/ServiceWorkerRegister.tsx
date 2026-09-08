@@ -1,17 +1,17 @@
 "use client";
 
 import { useEffect } from "react";
-import { ensureServiceWorkerRegistration } from "@/lib/push-client";
+import { ensureModuleServiceWorker } from "@/lib/sw-register";
 
-export default function ServiceWorkerRegister() {
+// Shares one registration helper with the push subscription flow, so both
+// agree on the scope and on what "registered and active" means.
+export default function ServiceWorkerRegister({ basePath = "/kanban" }: { basePath?: string }) {
   useEffect(() => {
     if (typeof window === "undefined" || !("serviceWorker" in navigator)) return;
-    // Shares one registration helper with the push subscription flow, so
-    // both agree on the scope and on what "registered and active" means.
-    ensureServiceWorkerRegistration().catch((err) =>
+    ensureModuleServiceWorker(basePath).catch((err) =>
       console.error("No se pudo registrar el service worker", err)
     );
-  }, []);
+  }, [basePath]);
 
   return null;
 }

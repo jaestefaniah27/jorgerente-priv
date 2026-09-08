@@ -69,10 +69,32 @@ CREATE TABLE IF NOT EXISTS push_subscriptions (
   created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
 );
 
+CREATE TABLE IF NOT EXISTS work_sessions (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  started_at TEXT NOT NULL,
+  ended_at TEXT,
+  local_date TEXT NOT NULL,
+  auto_closed INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+
+CREATE TABLE IF NOT EXISTS work_breaks (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  session_id INTEGER NOT NULL REFERENCES work_sessions(id) ON DELETE CASCADE,
+  started_at TEXT NOT NULL,
+  ended_at TEXT,
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+
 CREATE INDEX IF NOT EXISTS idx_tasks_project ON tasks(project_id);
 CREATE INDEX IF NOT EXISTS idx_tasks_epic ON tasks(epic_id);
 CREATE INDEX IF NOT EXISTS idx_tasks_reminder ON tasks(reminder_at, reminder_sent_at);
 CREATE INDEX IF NOT EXISTS idx_time_entries_task ON time_entries(task_id);
+CREATE INDEX IF NOT EXISTS idx_work_sessions_local_date ON work_sessions(local_date);
+CREATE INDEX IF NOT EXISTS idx_work_sessions_open ON work_sessions(ended_at);
+CREATE INDEX IF NOT EXISTS idx_work_breaks_session ON work_breaks(session_id);
 `;
 
 // Adds the 'backlog' status to the tasks table's CHECK constraint. SQLite

@@ -15,6 +15,10 @@ const nextConfig: NextConfig = {
         source: "/kanban/sw.js",
         headers: [{ key: "Service-Worker-Allowed", value: "/kanban" }],
       },
+      {
+        source: "/fichar/sw.js",
+        headers: [{ key: "Service-Worker-Allowed", value: "/fichar" }],
+      },
     ];
   },
 };
