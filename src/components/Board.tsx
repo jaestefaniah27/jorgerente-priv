@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import type { Epic, Project, Status, TaskWithExtras } from "@/lib/types";
-import { STATUSES, STATUS_LABELS } from "@/lib/types";
+import { STATUSES, STATUS_COLUMNS, STATUS_LABELS } from "@/lib/types";
 import TaskCard from "./TaskCard";
 import TaskDetailModal from "./TaskDetailModal";
 import NewTaskModal from "./NewTaskModal";
@@ -115,7 +115,7 @@ export default function Board({
       )}
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {STATUSES.map((status) => (
+        {STATUS_COLUMNS.map((status) => (
           <div
             key={status}
             onDragOver={(e) => e.preventDefault()}

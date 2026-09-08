@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import NotificationsToggle from "./NotificationsToggle";
+import AppSwitcher from "./AppSwitcher";
 import type { Project } from "@/lib/types";
 import { PROJECTS_CHANGED_EVENT } from "@/lib/events";
 
@@ -64,8 +65,9 @@ export default function KanbanNav() {
             </Link>
           ))}
         </nav>
-        <div className="ml-auto">
+        <div className="ml-auto flex items-center gap-3">
           <NotificationsToggle />
+          <AppSwitcher />
         </div>
       </div>
     </header>

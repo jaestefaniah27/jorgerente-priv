@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from "next";
-import Link from "next/link";
 import ServiceWorkerRegister from "@/components/ServiceWorkerRegister";
+import AppSwitcher from "@/components/AppSwitcher";
 
 export const metadata: Metadata = {
   title: "Fichar — jorgerente",
@@ -28,9 +28,7 @@ export default function FicharLayout({ children }: { children: React.ReactNode }
       <nav className="border-b border-slate-200 bg-white">
         <div className="mx-auto flex max-w-xl items-center justify-between px-4 py-3">
           <span className="text-sm font-semibold text-slate-900">Fichar</span>
-          <Link href="/kanban" className="text-sm text-slate-500 hover:text-indigo-700">
-            Kanban →
-          </Link>
+          <AppSwitcher />
         </div>
       </nav>
       <main className="flex-1">{children}</main>

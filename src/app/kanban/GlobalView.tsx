@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import type { Epic, Priority, Project, Status, TaskWithExtras } from "@/lib/types";
-import { PRIORITIES, PRIORITY_LABELS, STATUSES, STATUS_LABELS } from "@/lib/types";
+import { PRIORITIES, PRIORITY_LABELS, STATUSES, STATUS_COLUMNS, STATUS_LABELS } from "@/lib/types";
 import TaskCard from "@/components/TaskCard";
 import TaskDetailModal from "@/components/TaskDetailModal";
 import NewProjectForm from "@/components/NewProjectForm";
@@ -183,7 +183,7 @@ export default function GlobalView({
           </div>
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {STATUSES.map((status) => (
+            {STATUS_COLUMNS.map((status) => (
               <div key={status} className="rounded-lg bg-slate-100 p-3">
                 <div className="mb-3 flex items-center justify-between">
                   <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-600">

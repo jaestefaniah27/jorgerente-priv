@@ -2,7 +2,16 @@ export type Priority = "low" | "medium" | "high" | "urgent";
 export type Status = "backlog" | "todo" | "in_progress" | "done";
 
 export const PRIORITIES: Priority[] = ["low", "medium", "high", "urgent"];
+
+// The order a task actually moves through. The ← → arrows step along this,
+// so Backlog stays where a task begins.
 export const STATUSES: Status[] = ["backlog", "todo", "in_progress", "done"];
+
+// The order the columns are laid out on screen. Backlog sits last so the
+// board opens on what's active instead of on the pile of things not started
+// yet. Deliberately separate from the flow above — moving a column must not
+// change what the arrows do.
+export const STATUS_COLUMNS: Status[] = ["todo", "in_progress", "done", "backlog"];
 
 export const PRIORITY_LABELS: Record<Priority, string> = {
   low: "Baja",
@@ -22,14 +31,15 @@ export const STATUS_LABELS: Record<Status, string> = {
 // straight to To Do.
 export const DEFAULT_NEW_TASK_STATUS: Status = "backlog";
 
-export const REMINDER_OFFSETS: { minutes: number; label: string }[] = [
-  { minutes: 10, label: "10 minutos antes" },
-  { minutes: 30, label: "30 minutos antes" },
+// Preset reminder offsets, in minutes before the due date.
+export const REMINDER_OFFSETS = [
+  { minutes: 15, label: "15 minutos antes" },
   { minutes: 60, label: "1 hora antes" },
   { minutes: 180, label: "3 horas antes" },
   { minutes: 1440, label: "1 día antes" },
   { minutes: 2880, label: "2 días antes" },
-];
+  { minutes: 10080, label: "1 semana antes" },
+] as const;
 
 export interface Project {
   id: number;

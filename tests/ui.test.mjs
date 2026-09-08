@@ -140,6 +140,15 @@ async function main() {
   await page.waitForURL(/\/kanban\/board\/\d+/);
   ok((await page.locator("h1", { hasText: "MX-5" }).count()) >= 1, "board page shows project name");
 
+  // Backlog is laid out last so the board opens on active work. The arrows
+  // still follow the flow order (backlog → to do → …), which the move
+  // assertions further down guard.
+  const columnOrder = (await page.locator("h2").allTextContents()).map((t) => t.trim());
+  ok(
+    JSON.stringify(columnOrder) === JSON.stringify(["To Do", "En progreso", "Hecho", "Backlog"]),
+    `Backlog is the last column (got ${JSON.stringify(columnOrder)})`
+  );
+
   // Only the Backlog column has an "add task" button — clicking it opens
   // the full creation modal (title, priority, epic, estimate, due date +
   // reminder, and the "send straight to To Do" checkbox).
