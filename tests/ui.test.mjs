@@ -28,20 +28,35 @@ async function main() {
   });
   const consoleErrors = [];
   const page = await browser.newPage();
+  // Headless Chromium has no push service, so the push subscription step is
+  // expected to fail noisily here. That noise isn't a regression; anything
+  // else still is.
+  const isExpectedPushNoise = (text) =>
+    /push|notification|AbortError|Registration failed/i.test(text);
   page.on("console", (msg) => {
-    if (msg.type() === "error") consoleErrors.push(msg.text());
+    if (msg.type() === "error" && !isExpectedPushNoise(msg.text())) consoleErrors.push(msg.text());
   });
-  page.on("pageerror", (err) => consoleErrors.push(String(err)));
+  page.on("pageerror", (err) => {
+    if (!isExpectedPushNoise(String(err))) consoleErrors.push(String(err));
+  });
 
   // --- PWA assets reachable -------------------------------------------
   let res = await page.request.get(`${BASE}/kanban/manifest.webmanifest`);
   ok(res.status() === 200, `manifest.webmanifest -> 200 (got ${res.status()})`);
   const manifest = await res.json();
-  ok(manifest.scope === "/kanban/", "manifest scope is /kanban/");
+  ok(manifest.scope === "/kanban", "manifest scope is /kanban");
+  ok(
+    manifest.start_url.startsWith(manifest.scope),
+    `manifest start_url (${manifest.start_url}) is inside its scope (${manifest.scope})`
+  );
   ok(Array.isArray(manifest.icons) && manifest.icons.length === 2, "manifest declares icons");
 
   res = await page.request.get(`${BASE}/kanban/sw.js`);
   ok(res.status() === 200, `sw.js -> 200 (got ${res.status()})`);
+  ok(
+    res.headers()["service-worker-allowed"] === "/kanban",
+    `sw.js sends Service-Worker-Allowed: /kanban (got ${res.headers()["service-worker-allowed"]})`
+  );
 
   // --- Empty state -------------------------------------------------
   await page.goto(`${BASE}/kanban`, { waitUntil: "networkidle" });
@@ -51,11 +66,62 @@ async function main() {
     "empty state message shown with no projects"
   );
 
-  const swRegistered = await page.evaluate(async () => {
-    const reg = await navigator.serviceWorker.getRegistration("/kanban/");
-    return !!reg;
+  // Regression guard for the "Activar avisos" hang. The worker used to be
+  // registered with scope "/kanban/", which does NOT cover the global view
+  // at "/kanban" (no trailing slash) — so navigator.serviceWorker.ready
+  // never settled there and the subscription flow hung forever on
+  // "Comprobando…". Everything below is raced against a timeout so a
+  // regression fails the test instead of hanging it.
+  const sw = await page.evaluate(async () => {
+    const timeout = (ms, value) => new Promise((r) => setTimeout(() => r(value), ms));
+    const regs = await navigator.serviceWorker.getRegistrations();
+    const reg = regs.find((r) => new URL(r.scope).pathname.replace(/\/+$/, "") === "/kanban");
+    const ready = await Promise.race([
+      navigator.serviceWorker.ready.then(() => "settled"),
+      timeout(8000, "never-settled"),
+    ]);
+    return {
+      found: !!reg,
+      scopePath: reg ? new URL(reg.scope).pathname : null,
+      activated: reg?.active?.state ?? null,
+      ready,
+    };
   });
-  ok(swRegistered, "service worker registered with /kanban/ scope");
+  ok(sw.found, "service worker registration found for the kanban module");
+  ok(sw.scopePath === "/kanban", `worker scope covers the global view (got ${sw.scopePath})`);
+  ok(sw.activated === "activated", `worker is activated (got ${sw.activated})`);
+  ok(
+    sw.ready === "settled",
+    "navigator.serviceWorker.ready settles on /kanban (the bug that hung 'Activar avisos')"
+  );
+
+  // And the user-visible symptom: clicking "Activar avisos" must reach a
+  // definite outcome. Headless Chromium has no real push service, so the
+  // subscription itself is expected to fail here — what this asserts is
+  // that the button stops saying "Comprobando…" instead of hanging.
+  await page.context().grantPermissions(["notifications"], { origin: BASE });
+  const notifyButton = page.getByRole("button", { name: /Activar avisos|Comprobando/ });
+  if ((await notifyButton.count()) > 0) {
+    await notifyButton.first().click();
+    let settledLabel = null;
+    for (let i = 0; i < 60; i++) {
+      await page.waitForTimeout(500);
+      const stillChecking =
+        (await page.getByRole("button", { name: "Comprobando…" }).count()) > 0;
+      if (!stillChecking) {
+        settledLabel = (await page.locator("nav").innerText()).includes("Avisos activados")
+          ? "subscribed"
+          : "resolved";
+        break;
+      }
+    }
+    ok(
+      settledLabel !== null,
+      "'Activar avisos' reaches a definite state instead of hanging on 'Comprobando…'"
+    );
+  } else {
+    ok(false, "notifications toggle button rendered in the nav");
+  }
 
   // --- Create a project via the UI --------------------------------------
   await page.getByText("+ Nuevo proyecto").click();

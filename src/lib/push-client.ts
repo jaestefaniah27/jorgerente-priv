@@ -1,6 +1,17 @@
 // Browser-side helper for Web Push subscription. Kept separate from
 // src/lib/push.ts (server-side sending) since this runs in the browser.
 
+const SW_URL = "/kanban/sw.js";
+// Broad scope so the worker also covers the global view at "/kanban"
+// (no trailing slash). Registering a scope above the script's own
+// directory requires the Service-Worker-Allowed header, which
+// next.config.ts sets for /kanban/sw.js.
+const SW_SCOPE = "/kanban";
+// Scope the script gets by default when the header isn't honoured (e.g.
+// a proxy strips it). Push still works from here — push events go to the
+// registration, which does not need to control the current page.
+const SW_FALLBACK_SCOPE = "/kanban/";
+
 export function urlBase64ToUint8Array(base64String: string): Uint8Array {
   const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
   const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
@@ -12,14 +23,9 @@ export function urlBase64ToUint8Array(base64String: string): Uint8Array {
   return outputArray;
 }
 
-// Wraps a promise so it can never hang the caller forever. Some browsers
-// don't reject Notification.requestPermission() when they decline to show
-// a real prompt — Chrome's "quiet" permission UI, for example, renders as a
-// small, easy-to-miss icon next to the address bar instead of a banner, and
-// the promise then simply never settles until that icon is clicked. Without
-// this, that leaves the button stuck on "Comprobando…" forever with no
-// error and nothing wrong to report. A similar risk exists for
-// serviceWorker.ready if activation ever stalls.
+// Wraps a promise so it can never hang the caller forever. Belt and braces
+// for the browser APIs below, which under some conditions neither resolve
+// nor reject (Safari's pushManager.subscribe() is a known offender).
 function withTimeout<T>(promise: Promise<T>, ms: number, timeoutMessage: string): Promise<T> {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error(timeoutMessage)), ms);
@@ -36,6 +42,58 @@ function withTimeout<T>(promise: Promise<T>, ms: number, timeoutMessage: string)
   });
 }
 
+// Finds this module's registration whatever scope it was created under —
+// "/kanban" (current) or "/kanban/" (what older visits registered).
+async function findKanbanRegistration(): Promise<ServiceWorkerRegistration | undefined> {
+  const registrations = await navigator.serviceWorker.getRegistrations();
+  return registrations.find((r) => {
+    try {
+      return new URL(r.scope).pathname.replace(/\/+$/, "") === "/kanban";
+    } catch {
+      return false;
+    }
+  });
+}
+
+function waitForActivation(registration: ServiceWorkerRegistration): Promise<void> {
+  const worker = registration.active ?? registration.waiting ?? registration.installing;
+  if (!worker || worker.state === "activated") return Promise.resolve();
+  return new Promise((resolve) => {
+    const onStateChange = () => {
+      if (worker.state === "activated" || worker.state === "redundant") {
+        worker.removeEventListener("statechange", onStateChange);
+        resolve();
+      }
+    };
+    worker.addEventListener("statechange", onStateChange);
+  });
+}
+
+// Registers (or reuses) the service worker and waits until it is actually
+// activated.
+//
+// Deliberately does NOT use navigator.serviceWorker.ready: `ready` only
+// settles once a registration's scope covers the CURRENT page URL, and the
+// global view lives at "/kanban" while the worker's original scope was
+// "/kanban/" — which does not cover it. That is the bug behind "Activar
+// avisos" hanging on "Comprobando…" forever: the worker was registered and
+// activated, but `ready` simply never resolved on that page. Verified in a
+// real browser: on /kanban it never settles, on /kanban/board/N it does.
+// Looking the registration up explicitly works from any page.
+export async function ensureServiceWorkerRegistration(): Promise<ServiceWorkerRegistration> {
+  const existing = await findKanbanRegistration();
+  let registration = existing;
+  if (!registration) {
+    try {
+      registration = await navigator.serviceWorker.register(SW_URL, { scope: SW_SCOPE });
+    } catch {
+      registration = await navigator.serviceWorker.register(SW_URL, { scope: SW_FALLBACK_SCOPE });
+    }
+  }
+  await waitForActivation(registration);
+  return registration;
+}
+
 export async function subscribeToPush(): Promise<
   { status: "subscribed" } | { status: "unsupported" | "disabled" | "denied" | "error"; message?: string }
 > {
@@ -43,19 +101,14 @@ export async function subscribeToPush(): Promise<
     return { status: "unsupported" };
   }
 
-  // Everything below is wrapped in one try/catch: Notification.requestPermission()
-  // in particular can throw synchronously in some browsers (notably Safari,
-  // which requires the call to happen directly inside a user-gesture handler
-  // — an earlier `await` before it, or an uncaught rejection anywhere in this
-  // chain, used to leave the caller's promise permanently unresolved and the
-  // "Activar avisos" button stuck on "Comprobando…" forever). Request
-  // permission first, before any other await, to keep it as close to the
-  // click as possible.
   try {
+    // Request permission first, before any other await, so the call stays as
+    // close to the click as possible — Safari requires it to happen inside
+    // the user-gesture handler.
     const permission = await withTimeout(
       Notification.requestPermission(),
       20000,
-      "El navegador no respondió a la petición de permiso de notificaciones en 20s. Puede que haya quedado un aviso pendiente junto a la barra de direcciones (a veces se muestra como un pequeño icono en vez de una ventana emergente) o que las notificaciones estén bloqueadas para este sitio: revísalo y vuelve a intentarlo."
+      "El navegador no respondió a la petición de permiso de notificaciones. Puede que haya quedado un aviso pendiente junto a la barra de direcciones, o que las notificaciones estén bloqueadas para este sitio."
     );
     if (permission !== "granted") {
       return { status: "denied" };
@@ -68,35 +121,31 @@ export async function subscribeToPush(): Promise<
     }
 
     const registration = await withTimeout(
-      navigator.serviceWorker.ready,
+      ensureServiceWorkerRegistration(),
       15000,
       "El service worker no se activó a tiempo. Recarga la página e inténtalo de nuevo."
     );
-    let subscription = await withTimeout(
-      registration.pushManager.getSubscription(),
-      10000,
-      "El navegador no respondió al comprobar la suscripción existente. Recarga la página e inténtalo de nuevo."
-    );
+
+    let subscription = await registration.pushManager.getSubscription();
     if (!subscription) {
-      // The actual subscribe() call — right after granting permission — is
-      // the step known to hang indefinitely in Safari (a long-standing
-      // WebKit issue: it neither resolves nor rejects under some
-      // conditions). This is the step Jorge hit: permission granted, then
-      // stuck on "Comprobando…" with nothing ever happening.
       subscription = await withTimeout(
         registration.pushManager.subscribe({
           userVisibleOnly: true,
           applicationServerKey: urlBase64ToUint8Array(keyData.publicKey) as unknown as BufferSource,
         }),
-        15000,
-        "Safari no completó la suscripción a notificaciones push a tiempo (es un fallo conocido de WebKit). Prueba a recargar la página y a repetirlo; si sigue sin funcionar, puede ser una limitación de Safari en este equipo."
+        20000,
+        "El navegador no completó la suscripción a notificaciones push. En iPhone/iPad hace falta añadir la app a la pantalla de inicio para que Safari permita los avisos."
       );
     }
-    await fetch("/api/kanban/push/subscribe", {
+
+    const saveRes = await fetch("/api/kanban/push/subscribe", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(subscription.toJSON()),
     });
+    if (!saveRes.ok) {
+      return { status: "error", message: "No se pudo guardar la suscripción en el servidor." };
+    }
     return { status: "subscribed" };
   } catch (err) {
     return { status: "error", message: err instanceof Error ? err.message : String(err) };
@@ -105,7 +154,7 @@ export async function subscribeToPush(): Promise<
 
 export async function getExistingSubscription(): Promise<PushSubscription | null> {
   if (typeof window === "undefined" || !("serviceWorker" in navigator)) return null;
-  const registration = await navigator.serviceWorker.getRegistration("/kanban/");
+  const registration = await findKanbanRegistration();
   if (!registration) return null;
   return registration.pushManager.getSubscription();
 }

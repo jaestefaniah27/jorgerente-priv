@@ -28,6 +28,7 @@ Fuera de alcance en v1 (descartado explícitamente): checklist/subtareas, adjunt
 ## Avisos / recordatorios (notificaciones)
 - Canal: **Web Push** a la PWA instalada (no email, no solo aviso al abrir la app).
 - Requiere: claves VAPID, suscripción push guardada por dispositivo/instalación, y un proceso en el servidor que revise periódicamente qué avisos tocan disparar "ahora" y los envíe.
+- El service worker se registra con scope **`/kanban`** (sin barra final), no `/kanban/`: el scope con barra no cubre la propia vista global en `/kanban`, y eso hacía que `navigator.serviceWorker.ready` no se resolviera nunca ahí y el botón "Activar avisos" se quedara colgado en "Comprobando…" para siempre. Como el script vive en `/kanban/sw.js`, ese scope más amplio necesita la cabecera `Service-Worker-Allowed: /kanban`, que se envía desde `next.config.ts`. Por el mismo motivo el `scope` del manifest es `/kanban` (su `start_url` debe quedar dentro). El código de suscripción busca el registro con `getRegistrations()` en vez de usar `serviceWorker.ready`, para no volver a depender de la URL de la página.
 - Ver detalle técnico e implicaciones de infraestructura en `docs/decisions/README.md` (entrada de fecha límite + avisos) y, cuando se implemente, en `docs/infra.md`.
 
 ## Autenticación
