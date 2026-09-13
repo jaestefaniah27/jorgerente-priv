@@ -19,6 +19,7 @@ export interface ClockState {
   todayDate: string;
   weekStart: string;
   hasAutoClosed: boolean;
+  serverNowMs: number;
 }
 
 type CounterKey = "oficina" | "descanso" | "efectivo";
@@ -67,7 +68,10 @@ function storeCounter(key: CounterKey) {
 
 export default function ClockPage({ initial }: { initial: ClockState }) {
   const [state, setState] = useState<ClockState>(initial);
-  const [now, setNow] = useState(() => Date.now());
+  // Starts from the server's instant, not the browser's, so the first render
+  // is identical to the server HTML and hydration can't fail on a counter that
+  // ticked over in between. The interval below takes it from there.
+  const [now, setNow] = useState(initial.serverNowMs);
   const big = useSyncExternalStore(subscribe, getStoredCounter, getServerCounter);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);

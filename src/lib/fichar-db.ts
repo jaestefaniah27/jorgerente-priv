@@ -144,6 +144,14 @@ export interface ClockState {
   todayDate: string;
   weekStart: string;
   hasAutoClosed: boolean;
+  /**
+   * The instant this state was built. The browser uses it as the starting
+   * point for its live counters so its first render matches the server's
+   * exactly — otherwise, with a session running, a second boundary falling
+   * between render and hydration makes the two disagree and React throws out
+   * the server HTML. Measured at ~3 in 12 loads before this was passed down.
+   */
+  serverNowMs: number;
 }
 
 // The totals here deliberately EXCLUDE the session still running: the browser
@@ -167,5 +175,6 @@ export function buildClockState(nowMs: number = Date.now()): ClockState {
     todayDate,
     weekStart,
     hasAutoClosed: hasRecentAutoClosed(nowIso),
+    serverNowMs: nowMs,
   };
 }

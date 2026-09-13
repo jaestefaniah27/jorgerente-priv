@@ -275,10 +275,14 @@ export default function HistoryModal({
           <p className="py-6 text-center text-sm text-slate-400">Cargando…</p>
         ) : (
           <ul className="divide-y divide-slate-100">
-            {days.map((day) => {
+            {/* Newest first: opening the history should land on today, not on
+                a Monday you've already stopped thinking about. The API keeps
+                returning the week in calendar order — this is presentation,
+                same split as the board's column order. */}
+            {[...days].reverse().map((day) => {
               const totals = totalsForSessions(day.sessions, now);
               return (
-                <li key={day.date} className="py-3">
+                <li key={day.date} data-date={day.date} className="py-3">
                   <div className="flex items-baseline justify-between gap-3">
                     <span className="text-sm font-medium capitalize text-slate-700">
                       {dayLabel(day.date)}
@@ -294,7 +298,10 @@ export default function HistoryModal({
                     )}
                   </div>
 
-                  {day.sessions.map((s) => (
+                  {/* Same rule within a day: a split shift shows the
+                      afternoon above the morning. Breaks stay in order inside
+                      their session — there they read as a timeline, not a feed. */}
+                  {[...day.sessions].reverse().map((s) => (
                     <div key={s.id} className="mt-2 rounded-lg bg-slate-50 px-3 py-2">
                       <div className="flex items-center justify-between gap-2">
                         <span className="text-sm tabular-nums text-slate-700">

@@ -176,6 +176,17 @@ async function main() {
   );
   ok((await page.getByRole("button", { name: "Editar" }).count()) >= 1, "the session can be edited");
 
+  // The history reads newest first, so today is at the top rather than
+  // several days down.
+  const dayOrder = await page
+    .locator("li[data-date]")
+    .evaluateAll((els) => els.map((el) => el.getAttribute("data-date")));
+  ok(dayOrder.length === 7, `the week shows all 7 days (got ${dayOrder.length})`);
+  ok(
+    dayOrder.every((d, i) => i === 0 || dayOrder[i - 1] > d),
+    `days run newest first (got ${JSON.stringify(dayOrder)})`
+  );
+
   await page.getByRole("button", { name: "Semana anterior" }).click();
   await page.waitForTimeout(600);
   ok(
